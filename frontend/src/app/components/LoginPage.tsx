@@ -222,34 +222,7 @@ export function LoginPage({
               </PrimaryButton>
             </div>
 
-            {/* Demo Accounts Info */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <p
-                className="mb-2"
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  fontWeight: 600,
-                  color: "var(--text-dark)",
-                }}
-              >
-                حسابات تجريبية:
-              </p>
-              <div
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  color: "var(--text-medium)",
-                }}
-              >
-                <p className="mb-1">
-                  <strong>مستخدم:</strong> user@wordpress.local (كلمة المرور: أي
-                  شيء)
-                </p>
-                <p>
-                  <strong>مدير:</strong> admin@wordpress.local (كلمة المرور: أي
-                  شيء)
-                </p>
-              </div>
-            </div>
+          
           </form>
         </div>
 

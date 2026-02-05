@@ -7,7 +7,8 @@ import axios, { AxiosInstance } from "axios";
 
 class ApiService {
   private api: AxiosInstance;
-  private baseURL = "https://arabic-web-production.up.railway.app/api";
+  // Use production API URL
+  private baseURL = "https://b2005.com/api";
   private token: string | null = null;
 
   constructor() {
@@ -15,14 +16,13 @@ class ApiService {
     // Ensure global axios default uses the provided backend URL
     axios.defaults.baseURL = this.baseURL;
 
-   this.api = axios.create({
-  baseURL: this.baseURL,
-  headers: {
-    "Content-Type": "application/json",
-    "Accept": "application/json", // ✅ هذا هو المفتاح
-  },
-});
-
+    this.api = axios.create({
+      baseURL: this.baseURL,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json", // ✅ هذا هو المفتاح
+      },
+    });
 
     // Load token from localStorage if exists
     this.token = localStorage.getItem("auth_token");
@@ -191,6 +191,11 @@ class ApiService {
   async createSection(name: string) {
     try {
       const response = await this.api.post("/sections", { name });
+      console.log("[apiService] POST /sections response:", {
+        status: response.status,
+        data: response.data,
+        fullResponse: response,
+      });
       return response.data;
     } catch (error: any) {
       if (error.response) {
@@ -270,6 +275,12 @@ class ApiService {
 
   async deleteTable(id: number) {
     const response = await this.api.delete(`/tables/${id}`);
+    return response.data;
+  }
+
+  // Section deletion
+  async deleteSection(id: number) {
+    const response = await this.api.delete(`/sections/${id}`);
     return response.data;
   }
 
@@ -398,4 +409,5 @@ class ApiService {
 // Export singleton instance
 export const apiService = new ApiService();
 
+// Default export for legacy/default imports used across the app
 export default apiService;

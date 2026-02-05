@@ -26,6 +26,7 @@ Route::middleware('cors')->group(function () {
         // Sections
         Route::get('/sections', [SectionController::class, 'index']);
         Route::post('/sections', [SectionController::class, 'store']);
+        Route::delete('/sections/{id}', [SectionController::class, 'destroy']);
 
         // Tables
         Route::get('/tables', [TableController::class, 'index']);

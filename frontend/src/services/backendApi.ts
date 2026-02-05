@@ -1,7 +1,7 @@
 // API Service for Backend Communication
 // This file contains all API calls to the Laravel backend
 
-const API_BASE_URL = "https://arabic-web-production.up.railway.app/api";
+const API_BASE_URL = "https://b2005.com/api";
 
 // Helper function to get auth token
 function getAuthToken(): string | null {

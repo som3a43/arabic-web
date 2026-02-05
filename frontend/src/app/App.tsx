@@ -7,6 +7,7 @@ import { InspectionTabs } from "./components/InspectionTabs";
 import { PrimaryButton } from "./components/PrimaryButton";
 import { SecondaryButton } from "./components/SecondaryButton";
 import AddSectionModal from "./components/AddSectionModal";
+import { DeleteConfirmDialog } from "./components/DeleteConfirmDialog";
 import { AnimatedAddButton } from "./components/AnimatedAddButton";
 import { UserHeader } from "./components/UserHeader";
 import { AdminPanel } from "./components/AdminPanel";
@@ -37,6 +38,11 @@ interface UserTableData {
     tables: TableData[];
     activeTableId: string;
   };
+}
+
+interface SectionItem {
+  id: number | null;
+  name: string;
 }
 
 // activeSection is a dynamic string (section name) or special keys like 'notes','images','admin'
@@ -73,7 +79,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [authView, setAuthView] = useState<"login" | "register">("login");
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [sections, setSections] = useState<string[]>([]);
+  const [sections, setSections] = useState<SectionItem[]>([]);
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [sectionError, setSectionError] = useState<string | null>(null);
@@ -81,6 +87,12 @@ function App() {
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [generalNotes, setGeneralNotes] = useState<string>("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sectionToDelete, setSectionToDelete] = useState<{
+    id: number | null;
+    name: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Store tables per user
   const [userTablesData, setUserTablesData] = useState<UserTableData>({
@@ -177,17 +189,21 @@ function App() {
           return [];
         })();
 
-        const names: string[] = normalizedArray
+        const sectionObjs: SectionItem[] = normalizedArray
           .map((it) => {
-            if (!it) return "";
-            if (typeof it === "string") return it;
+            if (!it) return null;
+            if (typeof it === "string") return { id: null, name: it };
             if (typeof it === "object")
-              return it.name || it.title || it.label || String(it);
-            return String(it);
+              return {
+                id: it.id || null,
+                name: it.name || it.title || it.label || String(it),
+              };
+            return { id: null, name: String(it) };
           })
-          .filter((n) => !!n);
+          .filter((n): n is SectionItem => !!n);
 
-        setSections(names);
+        setSections(sectionObjs);
+        const names = sectionObjs.map((s) => s.name);
         const last = localStorage.getItem(`last_section_${currentUser.email}`);
         if (last && names.includes(last)) {
           handleSectionSelect(last);
@@ -209,9 +225,9 @@ function App() {
           try {
             setSectionError(
               error.response.data?.message ||
-              (typeof error.response.data === "string"
-                ? error.response.data
-                : "خطأ في بيانات الأقسام"),
+                (typeof error.response.data === "string"
+                  ? error.response.data
+                  : "خطأ في بيانات الأقسام"),
             );
           } catch (setErr) {
             // ignore
@@ -229,19 +245,48 @@ function App() {
     if (!trimmed) throw new Error("الاسم لا يمكن أن يكون فارغًا");
     const exists = sections.some(
       (x) =>
-        x.localeCompare(trimmed, undefined, { sensitivity: "accent" }) === 0,
+        x.name.localeCompare(trimmed, undefined, { sensitivity: "accent" }) ===
+        0,
     );
     if (exists) throw new Error("القسم موجود بالفعل");
     if (!currentUser) throw new Error("يرجى تسجيل الدخول لإنشاء قسم");
     try {
       const res = await apiService.createSection(trimmed);
-      const createdName = res.name || trimmed;
-      setSections((prev) => [createdName, ...prev]);
-      setActiveSection(createdName);
+      console.log("[App] Create section response:", res);
+
+      // Handle different response formats
+      let sectionId = null;
+      let sectionName = trimmed;
+
+      if (res && typeof res === "object") {
+        // Direct format: {id, name}
+        if (res.id !== undefined) {
+          sectionId = res.id;
+          sectionName = res.name || trimmed;
+        }
+        // Wrapped format: {data: {id, name}}
+        else if (res.data && res.data.id !== undefined) {
+          sectionId = res.data.id;
+          sectionName = res.data.name || trimmed;
+        }
+        // Legacy or other formats
+        else {
+          sectionName = res.name || trimmed;
+          sectionId = res.id || null;
+        }
+      }
+
+      const createdObj: SectionItem = {
+        id: sectionId,
+        name: sectionName,
+      };
+      console.log("[App] Created section object:", createdObj);
+      setSections((prev) => [createdObj, ...prev]);
+      setActiveSection(createdObj.name);
       setShowAddSection(false);
       // clear any previous section error
       setSectionError(null);
-      return createdName;
+      return createdObj.name;
     } catch (err: any) {
       // If server returned validation or duplicate message, surface it
       const serverMessage = err?.message || err?.response?.data?.message;
@@ -265,26 +310,29 @@ function App() {
             if (typeof list === "object") return Object.values(list);
             return [];
           })();
-          const names: string[] = normalizedArray
+          const sectionObjs: SectionItem[] = normalizedArray
             .map((it) => {
-              if (!it) return "";
-              if (typeof it === "string") return it;
+              if (!it) return null;
+              if (typeof it === "string") return { id: null, name: it };
               if (typeof it === "object")
-                return it.name || it.title || it.label || String(it);
-              return String(it);
+                return {
+                  id: it.id || null,
+                  name: it.name || it.title || it.label || String(it),
+                };
+              return { id: null, name: String(it) };
             })
-            .filter((n) => !!n);
+            .filter((n): n is SectionItem => !!n);
 
-          setSections(names);
+          setSections(sectionObjs);
           // try to find a matching name (case-insensitive, trim)
-          const match = names.find(
-            (n) => n.trim().toLowerCase() === trimmed.toLowerCase(),
+          const match = sectionObjs.find(
+            (n) => n.name.trim().toLowerCase() === trimmed.toLowerCase(),
           );
           if (match) {
-            setActiveSection(match);
+            setActiveSection(match.name);
             setShowAddSection(false);
             setSectionError(null);
-            return match;
+            return match.name;
           }
         } catch (refreshErr) {
           // ignore refresh errors, fallthrough to surface original message
@@ -299,6 +347,115 @@ function App() {
       setSectionError("فشل إنشاء القسم");
       throw err;
     }
+  };
+
+  // Delete a section by id (or by name if id not known)
+  const handleDeleteSection = async (id: number | null, name: string) => {
+    if (!currentUser) {
+      alert("يرجى تسجيل الدخول لحذف الأقسام");
+      return;
+    }
+    // Open the confirmation dialog
+    setSectionToDelete({ id, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSection = async () => {
+    if (!sectionToDelete || !currentUser) return;
+
+    const { id, name } = sectionToDelete;
+    console.log("[App] Deleting section:", { id, name, allSections: sections });
+    try {
+      setIsDeleting(true);
+      let sectionId = id;
+
+      // If no ID, try to find it from current sections state
+      if (!sectionId) {
+        console.log("[App] No ID provided, searching in sections state...");
+        const found = sections.find(
+          (s) => s.name.trim().toLowerCase() === name.trim().toLowerCase(),
+        );
+        console.log("[App] Found in state:", found);
+        sectionId = found?.id || null;
+      }
+
+      // If still no ID, refresh from backend
+      if (!sectionId) {
+        console.log("[App] Still no ID, refreshing from backend...");
+        try {
+          const list = await apiService.getSections();
+          console.log("[App] Fresh sections list:", list);
+          const normalizedArray: any[] = (() => {
+            if (!list) return [];
+            if (Array.isArray(list)) return list;
+            if (Array.isArray(list.data)) return list.data;
+            if (Array.isArray(list.sections)) return list.sections;
+            if (Array.isArray(list.items)) return list.items;
+            if (typeof list === "object") return Object.values(list);
+            return [];
+          })();
+          const found = normalizedArray
+            .map((it) =>
+              typeof it === "string"
+                ? { id: null, name: it }
+                : {
+                    id: it.id || null,
+                    name: it.name || it.title || it.label || String(it),
+                  },
+            )
+            .find(
+              (s: any) =>
+                s.name &&
+                s.name.trim().toLowerCase() === name.trim().toLowerCase(),
+            );
+          console.log("[App] Found from API:", found);
+          sectionId = found?.id || null;
+        } catch (refreshErr) {
+          console.error("Failed to refresh sections", refreshErr);
+        }
+      }
+
+      console.log("[App] Final section ID to delete:", sectionId);
+      if (!sectionId || sectionId === null) {
+        alert("تعذر العثور على معرف القسم. تأكد من اختيار القسم بشكل صحيح.");
+        setDeleteDialogOpen(false);
+        setSectionToDelete(null);
+        setIsDeleting(false);
+        return;
+      }
+
+      await apiService.deleteSection(Number(sectionId));
+      console.log("[App] Delete API call succeeded for section ID:", sectionId);
+
+      // remove from local state
+      setSections((prev) =>
+        prev.filter((s) => !(s.id === sectionId && s.name === name)),
+      );
+
+      // If deleted section was active, pick another or fallback
+      if (activeSection === name) {
+        const remaining = sections.filter(
+          (s) => !(s.id === sectionId && s.name === name),
+        );
+        if (remaining.length > 0) setActiveSection(remaining[0].name);
+        else setActiveSection("notes");
+      }
+
+      setDeleteDialogOpen(false);
+      setSectionToDelete(null);
+    } catch (e) {
+      console.error("Failed to delete section", e);
+      alert("فشل حذف القسم. حاول مرة أخرى.");
+      setDeleteDialogOpen(false);
+      setSectionToDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDeleteSection = () => {
+    setDeleteDialogOpen(false);
+    setSectionToDelete(null);
   };
 
   const getCurrentUserData = () => {
@@ -433,22 +590,22 @@ function App() {
             const mapped = [
               ...(created
                 ? [
-                  {
-                    id: String(created.id),
-                    label: created.label || newLabel,
-                    data:
-                      created.data ||
-                      Array(12)
-                        .fill(null)
-                        .map(() => Array(20).fill("")),
-                    columnHeaders:
-                      created.column_headers || Array(20).fill(""),
-                    notes: created.notes || "",
-                    section: created.section || category,
-                    lastUpdated:
-                      created.last_updated || created.updated_at || null,
-                  },
-                ]
+                    {
+                      id: String(created.id),
+                      label: created.label || newLabel,
+                      data:
+                        created.data ||
+                        Array(12)
+                          .fill(null)
+                          .map(() => Array(20).fill("")),
+                      columnHeaders:
+                        created.column_headers || Array(20).fill(""),
+                      notes: created.notes || "",
+                      section: created.section || category,
+                      lastUpdated:
+                        created.last_updated || created.updated_at || null,
+                    },
+                  ]
                 : []),
             ];
             return {
@@ -692,7 +849,7 @@ function App() {
             },
           };
         });
-        alert("تم الحفظ التلقائي بنجاح");
+        // alert("تم الحفظ التلقائي بنجاح");
       } catch (e) {
         console.error("Auto-save failed", e);
         alert("فشل الحفظ التلقائي");
@@ -745,7 +902,7 @@ function App() {
           },
         };
       });
-      alert("تم الحفظ التلقائي بنجاح");
+      // alert("تم الحفظ التلقائي بنجاح");
     } catch (e) {
       console.error("Auto-save failed", e);
       alert("فشل الحفظ التلقائي");
@@ -1022,6 +1179,7 @@ function App() {
 
   // Get table title based on active section
   const getTableTitle = () => {
+    // If activeSection maps to a known code, return its label; otherwise return the activeSection name (dynamic)
     switch (activeSection) {
       case "building1":
         return "عمارة 1";
@@ -1030,7 +1188,7 @@ function App() {
       case "school":
         return "مدرسة";
       default:
-        return "";
+        return activeSection || "";
     }
   };
 
@@ -1039,6 +1197,15 @@ function App() {
       className="min-h-screen bg-gray-50"
       style={{ fontFamily: "Cairo, sans-serif" }}
     >
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        sectionName={sectionToDelete?.name || ""}
+        onConfirm={confirmDeleteSection}
+        onCancel={cancelDeleteSection}
+        isLoading={isDeleting}
+      />
+
       {/* User Header */}
       <UserHeader
         user={currentUser}
@@ -1084,13 +1251,32 @@ function App() {
           <div className="flex gap-4 flex-wrap">
             {/* Dynamic sections loaded from API */}
             {sections.map((s) => (
-              <TopSelectionButton
-                key={s}
-                isActive={activeSection === s}
-                onClick={() => handleSectionSelect(s)}
-              >
-                {s}
-              </TopSelectionButton>
+              <div key={s.id ?? s.name} className="relative group inline-block">
+                <TopSelectionButton
+                  isActive={activeSection === s.name}
+                  onClick={() => handleSectionSelect(s.name)}
+                  className="pr-10"
+                >
+                  {s.name}
+                </TopSelectionButton>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteSection(s.id, s.name);
+                  }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-100 transition-colors"
+                  style={{
+                    color: "#d32f2f",
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                    border: "none",
+                    background: "transparent",
+                  }}
+                  title="حذف القسم"
+                >
+                  ×
+                </button>
+              </div>
             ))}
 
             {/* Special buttons */}
@@ -1131,7 +1317,7 @@ function App() {
             open={showAddSection}
             onClose={() => setShowAddSection(false)}
             onCreate={handleCreateSectionSubmit}
-            existing={sections}
+            existing={sections.map((s) => s.name)}
           />
         </div>
 
