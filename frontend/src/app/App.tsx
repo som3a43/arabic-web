@@ -1,23 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { GeneralNotes } from "./components/GeneralNotes";
 import { TopSelectionButton } from "./components/TopSelectionButton";
-import { TableContainer } from "./components/TableContainer";
-import { NotesTextarea } from "./components/NotesTextarea";
-import { InspectionTabs } from "./components/InspectionTabs";
-import { PrimaryButton } from "./components/PrimaryButton";
-import { SecondaryButton } from "./components/SecondaryButton";
 import AddSectionModal from "./components/AddSectionModal";
 import { DeleteConfirmDialog } from "./components/DeleteConfirmDialog";
-import { AnimatedAddButton } from "./components/AnimatedAddButton";
 import { UserHeader } from "./components/UserHeader";
-import { AdminPanel } from "./components/AdminPanel";
-import { ImageUploadPage } from "./components/ImageUploadPage";
 import { LoginPage } from "./components/LoginPage";
 import { RegistrationPage } from "./components/RegistrationPage";
 import apiService from "../services/apiService";
-import { exportTableToPDF } from "./components/ExportByTable";
-import ExportByTableExample from "./components/ExportByTable";
-import PrintableTableDemo from "./components/PrintableTableDemo";
+import { HomePage, NotesPage, ImagesPage, AdminPage, SectionPage } from "./pages";
 
 interface TableData {
   id: string;
@@ -1323,142 +1312,44 @@ function App() {
 
         {/* Admin Panel */}
         {activeSection === "admin" && currentUser?.role === "admin" && (
-          <AdminPanel users={getAllUsersData()} />
+          <AdminPage users={getAllUsersData()} />
         )}
 
         {/* Image Upload Page */}
-        {activeSection === "images" && (
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <ImageUploadPage />
-          </div>
-        )}
+        {activeSection === "images" && <ImagesPage />}
 
         {/* Main Content - Only show when section is selected */}
         {activeSection &&
           activeSection !== "notes" &&
           activeSection !== "images" &&
           activeSection !== "admin" && (
-            <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
-              {/* Tabs for multiple tables */}
-              <InspectionTabs
-                tabs={userData.tables}
-                activeTab={userData.activeTableId}
-                onTabChange={setActiveTableId}
-                onRemoveTab={handleRemoveTable}
-                onRenameTab={handleRenameTable}
-                canRemove={userData.tables.length > 1}
-              />
-
-              {/* Table Title - Centered and Prominent */}
-              <div className="text-center mb-6">
-                <h2
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: 600,
-                    color: "var(--text-dark)",
-                  }}
-                >
-                  {getTableTitle()}
-                </h2>
-              </div>
-
-              {/* Table Section */}
-              <div className="mb-6">
-                {activeTable && (
-                  <div
-                    id={`export-table-${activeTable.id}`}
-                    data-name={activeTable.label}
-                    data-table-json={JSON.stringify({
-                      headers: activeTable.columnHeaders || [],
-                      data: activeTable.data || [],
-                      name: activeTable.label || "",
-                    })}
-                    dir="rtl"
-                  >
-                    <TableContainer
-                      rows={12}
-                      columns={20}
-                      data={activeTable.data}
-                      columnHeaders={activeTable.columnHeaders}
-                      onDataChange={handleDataChange}
-                      onColumnHeaderChange={handleColumnHeaderChange}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Add Table Button */}
-              {userData.tables.length < 3 && (
-                <div className="mb-6">
-                  <AnimatedAddButton onClick={handleAddTable}>
-                    إضافة جدول
-                  </AnimatedAddButton>
-                </div>
-              )}
-
-              {/* Notes Section */}
-              <div className="mb-6">
-                {activeTable && (
-                  <NotesTextarea
-                    value={activeTable.notes}
-                    onChange={handleNotesChange}
-                    tableName={activeTable.label}
-                    showSaveButton={true}
-                  />
-                )}
-              </div>
-
-              {/* Actions Section */}
-              <div className="flex gap-4 justify-start border-t border-[var(--light-gray)] pt-6">
-                <PrimaryButton
-                  onClick={() => {
-                    if (!activeTable) return;
-                    exportTableToPDF(`export-table-${activeTable.id}`);
-                  }}
-                >
-                  تصدير إلى PDF
-                </PrimaryButton>
-                <SecondaryButton onClick={handleAutoSave}>
-                  حفظ تلقائي
-                </SecondaryButton>
-              </div>
-            </div>
+            <SectionPage
+              sectionName={activeSection}
+              sectionTitle={getTableTitle()}
+              tables={userData.tables}
+              activeTableId={userData.activeTableId}
+              onTabChange={setActiveTableId}
+              onRemoveTab={handleRemoveTable}
+              onRenameTab={handleRenameTable}
+              onDataChange={handleDataChange}
+              onColumnHeaderChange={handleColumnHeaderChange}
+              onNotesChange={handleNotesChange}
+              onAddTable={handleAddTable}
+              onAutoSave={handleAutoSave}
+            />
           )}
 
         {/* Notes-only Section */}
         {activeSection === "notes" && (
-          <GeneralNotes
+          <NotesPage
             value={generalNotes}
             onChange={setGeneralNotes}
             onSave={handleAutoSave}
           />
         )}
 
-        {/* Initial State Message */}
-        {!activeSection && (
-          <div className="bg-white p-12 rounded-lg shadow-sm text-center">
-            <p
-              style={{
-                fontSize: "var(--font-size-lg)",
-                color: "var(--text-medium)",
-              }}
-            >
-              الرجاء اختيار قسم من الأعلى للبدء
-            </p>
-          </div>
-        )}
-        {/* Example exporter (shows when no section selected) */}
-        {!activeSection && (
-          <div className="mt-6">
-            <ExportByTableExample />
-          </div>
-        )}
-        {/* Printable table demo */}
-        {!activeSection && (
-          <div className="mt-6">
-            <PrintableTableDemo />
-          </div>
-        )}
+        {/* Initial State - Home Page */}
+        {!activeSection && <HomePage />}
       </div>
     </div>
   );
