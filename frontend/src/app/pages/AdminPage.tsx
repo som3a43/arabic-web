@@ -1,12 +1,6 @@
 import React from "react";
 import { AdminPanel } from "../components/AdminPanel";
 
-interface User {
-  email: string;
-  username: string;
-  role: "admin" | "user";
-}
-
 interface UserData {
   email: string;
   username: string;
